@@ -1,0 +1,1 @@
+"""Ingestion Flask application package."""
