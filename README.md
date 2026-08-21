@@ -367,11 +367,11 @@ tests/                  tests for the light rule and alert rule
 docker-compose.yml      runs everything locally
 ```
 
-## 10. Who did what
+## 10. Contribution
 
 | Service | Member | GitHub username |
 |---|---|---|
-| `ingestion` | | |
+| `ingestion` | Brendan | |
 | `gateway` | | |
 | `inference` | | |
 | `dashboard` | | |
