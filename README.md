@@ -370,10 +370,10 @@ docker-compose.yml      runs everything locally
 
 | Service | Member | GitHub username |
 |---|---|---|
-| `ingestion` | Brendan | |
-| `gateway` | | |
-| `inference` | | |
-| `dashboard` | | |
+| `ingestion` | Brendan | JIAKSA |
+| `gateway` | Nithish |  |
+| `inference` | Yee Sian | y33ticus-maximus |
+| `dashboard` | Jun lin | |
 
 Commit messages use the format `service: what changed`, for example
 `inference: lower the Critical threshold to catch more faults`.
