@@ -1,0 +1,125 @@
+# Runs the whole system with one command:
+#   docker compose up --build -d
+#
+# Only the gateway, dashboard and simulator are reachable from your machine.
+# The other services talk to each other on Docker's internal network, which is
+# the same arrangement used in the Kubernetes deployment.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: farm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-farm}
+      POSTGRES_DB: farmdb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Creates the tables the first time the database starts.
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U farm -d farmdb"]
+      interval: 5s
+      retries: 12
+
+  inference:
+    build:
+      context: .
+      dockerfile: services/inference/Dockerfile
+    image: farm-inference:1.0
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: services/ingestion/Dockerfile
+    image: farm-ingestion:1.0
+    environment:
+      DATABASE_URL: postgresql://farm:${POSTGRES_PASSWORD:-farm}@postgres:5432/farmdb
+      GATEWAY_URL: http://gateway:8000
+      FARM_UTC_OFFSET_HOURS: 8
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: services/dashboard/Dockerfile
+    image: farm-dashboard:1.0
+    environment:
+      DATABASE_URL: postgresql://farm:${POSTGRES_PASSWORD:-farm}@postgres:5432/farmdb
+      OPEN_AFTER: 2
+      CLOSE_AFTER: 3
+      # Your browser uses this address, not the container, so it must be a
+      # localhost URL rather than an internal service name.
+      GATEWAY_PUBLIC_URL: http://localhost:8080
+    ports:
+      - "3000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    image: farm-gateway:1.0
+    environment:
+      INGESTION_URL: http://ingestion:8000
+      INFERENCE_URL: http://inference:8000
+      DASHBOARD_URL: http://dashboard:8000
+    ports:
+      - "8080:8000"
+    depends_on:
+      ingestion:
+        condition: service_healthy
+      inference:
+        condition: service_healthy
+      dashboard:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request; assert json.load(urllib.request.urlopen('http://localhost:8000/health/all', timeout=3))['status'] == 'ok'"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 5s
+
+  simulator:
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
+    image: farm-simulator:1.0
+    environment:
+      GATEWAY_URL: http://gateway:8000
+      FARM_UTC_OFFSET_HOURS: 8
+    ports:
+      - "8090:8000"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  pgdata:
