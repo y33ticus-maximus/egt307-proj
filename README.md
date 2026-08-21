@@ -5,7 +5,7 @@ decides whether the zone is **Optimal**, **Warning** or **Critical**, and the
 dashboard raises an alert naming the zone and the likely equipment fault before
 the crop is damaged.
 
-
+ 
 ---
 
 ## 1. The problem
