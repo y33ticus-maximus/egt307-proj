@@ -373,7 +373,7 @@ docker-compose.yml      runs everything locally
 | `ingestion` | Brendan | JIAKSA |
 | `gateway` | Nithish |  |
 | `inference` | Yee Sian | y33ticus-maximus |
-| `dashboard` | Jun lin | |
+| `dashboard` | Jun lin |tcpfin-dev |
 
 Commit messages use the format `service: what changed`, for example
 `inference: lower the Critical threshold to catch more faults`.
