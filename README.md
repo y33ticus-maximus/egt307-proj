@@ -5,7 +5,6 @@ decides whether the zone is **Optimal**, **Warning** or **Critical**, and the
 dashboard raises an alert naming the zone and the likely equipment fault before
 the crop is damaged.
 
-**EGT307 AI Applications Development, 2026S1** · Nanyang Polytechnic, School of Engineering
 
 ---
 
