@@ -371,7 +371,7 @@ docker-compose.yml      runs everything locally
 | Service | Member | GitHub username |
 |---|---|---|
 | `ingestion` | Brendan | JIAKSA |
-| `gateway` | Nithish |  |
+| `gateway` | Nithish | Nithish-427  |
 | `inference` | Yee Sian | y33ticus-maximus |
 | `dashboard` | Jun lin |tcpfin-dev |
 
