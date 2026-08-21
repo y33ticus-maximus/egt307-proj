@@ -1,0 +1,1 @@
+"""Inference Flask application package."""
