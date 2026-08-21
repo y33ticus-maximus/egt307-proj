@@ -1,0 +1,53 @@
+# API gateway. The way in from outside the cluster.
+#
+# Note what happens with scaling here: the gateway sends every prediction
+# request to http://inference:8000, and Kubernetes spreads those across all
+# three copies. Going from 3 copies to 6 needs no change in this file or in any
+# code. That is the benefit of the inference service storing nothing.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: smart-farm
+spec:
+  type: NodePort
+  selector:
+    app: gateway
+  ports:
+    - port: 8000
+      nodePort: 30080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: smart-farm
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: farm-gateway:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef: {name: farm-config}
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 8
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits:   {cpu: 500m, memory: 256Mi}

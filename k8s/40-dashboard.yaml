@@ -1,0 +1,65 @@
+# Dashboard service. The web page, and the rule that decides when to alert.
+#
+# NodePort so a browser outside the cluster can open it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  namespace: smart-farm
+spec:
+  type: NodePort
+  selector:
+    app: dashboard
+  ports:
+    - port: 8000
+      nodePort: 30300
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: smart-farm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      containers:
+        - name: dashboard
+          image: farm-dashboard:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef: {name: farm-config}
+          env:
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: farm-secret, key: DATABASE_URL}}
+            # Your BROWSER uses this address, so it cannot be an internal
+            # service name. Change it to match how you reach the gateway:
+            #   kubectl -n smart-farm set env deployment/dashboard \
+            #       GATEWAY_PUBLIC_URL=http://localhost:8080
+            # The browser, not the cluster, calls this address, so it must be
+            # reachable from the user's machine. Run
+            #   kubectl -n smart-farm port-forward svc/gateway 8080:8000
+            # while the dashboard is open. To use the NodePort instead, set this
+            # to http://<minikube ip>:30080 and rebuild nothing: it is read at
+            # request time by /config.json.
+            - name: GATEWAY_PUBLIC_URL
+              value: "http://localhost:8080"
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: {path: /ready, port: 8000}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits:   {cpu: 500m, memory: 256Mi}

@@ -1,0 +1,125 @@
+# Namespace and configuration.
+#
+# The Namespace comes first because everything below it is created inside it,
+# and kubectl applies the documents in a file in order. Keeping the whole
+# system in one namespace means it can be removed in one command, which matters
+# when redeploying repeatedly during development:
+#
+#   kubectl delete namespace smart-farm
+#
+# Two ConfigMaps follow, for two different jobs:
+#   farm-config    environment variables read by the services at startup
+#   postgres-init  the SQL file PostgreSQL runs the first time it starts
+#
+# Nothing secret goes in here. The database password lives in 01-secret.yaml.
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: smart-farm
+  labels:
+    project: smart-farm
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: farm-config
+  namespace: smart-farm
+data:
+  # These are Kubernetes Service names. They are the same names used in
+  # docker-compose.yml, which is why no application code changes between the
+  # two deployments.
+  GATEWAY_URL: "http://gateway:8000"
+  INGESTION_URL: "http://ingestion:8000"
+  INFERENCE_URL: "http://inference:8000"
+  DASHBOARD_URL: "http://dashboard:8000"
+  # How many bad readings open an incident, and how many good ones close it.
+  OPEN_AFTER: "2"
+  CLOSE_AFTER: "3"
+  # The farm is in Singapore and the grow lights run on local time, but readings
+  # are timestamped in UTC. Without this offset the light check is wrong by
+  # eight hours and reports normal daylight as lights left on overnight.
+  FARM_UTC_OFFSET_HOURS: "8"
+---
+# The table definitions, copied from db/init.sql. This is mounted into the
+# PostgreSQL container at /docker-entrypoint-initdb.d, which is the directory
+# the official image runs on an empty database. That is what makes a fresh
+# cluster build its own schema with no manual step.
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: postgres-init
+  namespace: smart-farm
+data:
+  init.sql: |
+    -- Database schema. Loaded automatically the first time PostgreSQL starts.
+
+    -- What is growing in each zone. Nutrient levels come from a soil test, not
+    -- from a sensor, so they are stored per zone and attached to every reading
+    -- before the model sees it.
+    CREATE TABLE IF NOT EXISTS zones (
+        zone_id    TEXT PRIMARY KEY,
+        soil_type  TEXT NOT NULL,
+        nitrogen   REAL NOT NULL,
+        phosphorus REAL NOT NULL,
+        potassium  REAL NOT NULL
+    );
+
+    INSERT INTO zones (zone_id, soil_type, nitrogen, phosphorus, potassium) VALUES
+        ('Zone_01', 'Loam Soil',     62.8, 48.2, 63.4),
+        ('Zone_02', 'Sandy Soil',    58.8, 59.1, 52.4),
+        ('Zone_03', 'Clay Soil',     45.1, 31.7, 44.9),
+        ('Zone_04', 'Black Soil',    51.6, 36.2, 49.8)
+    ON CONFLICT (zone_id) DO NOTHING;
+
+    -- One row per sensor reading.
+    CREATE TABLE IF NOT EXISTS readings (
+        id              BIGSERIAL PRIMARY KEY,
+        zone_id         TEXT        NOT NULL,
+        recorded_at     TIMESTAMPTZ NOT NULL,
+        temperature     REAL,
+        soil_humidity   REAL,
+        soil_moisture   REAL,
+        air_humidity    REAL,
+        ph              REAL,
+        soil_ec         REAL,
+        pressure        REAL,
+        rainfall        REAL,
+        light_intensity REAL,
+        -- Sensors are nullable because the dataset contains genuine missing
+        -- values and a real farm will have more. Rejecting a whole reading
+        -- because one probe was silent would throw away the ten that worked.
+        --
+        -- The unique key makes a resent reading a no-op instead of a duplicate.
+        UNIQUE (zone_id, recorded_at)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_readings_zone_time ON readings (zone_id, recorded_at DESC);
+
+    -- The model's answer for each reading.
+    CREATE TABLE IF NOT EXISTS predictions (
+        id             BIGSERIAL PRIMARY KEY,
+        reading_id     BIGINT      NOT NULL REFERENCES readings(id) ON DELETE CASCADE,
+        zone_id        TEXT        NOT NULL,
+        label          TEXT        NOT NULL,   -- Optimal | Warning | Critical | pending
+        confidence     REAL,
+        driver         TEXT,                   -- the sensor furthest from healthy
+        probable_cause TEXT,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (reading_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_predictions_zone ON predictions (zone_id, created_at DESC);
+
+    -- An incident is raised only after several bad readings in a row, so one
+    -- zone with a real problem produces one alert rather than one per reading.
+    CREATE TABLE IF NOT EXISTS incidents (
+        id             BIGSERIAL PRIMARY KEY,
+        zone_id        TEXT        NOT NULL,
+        severity       TEXT        NOT NULL,   -- Warning | Critical
+        probable_cause TEXT        NOT NULL,
+        opened_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        closed_at      TIMESTAMPTZ,
+        status         TEXT        NOT NULL DEFAULT 'open'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_incidents_recent ON incidents (opened_at DESC);

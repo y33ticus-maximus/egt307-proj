@@ -1,0 +1,62 @@
+# Ingestion service. Receives readings, validates them and stores them.
+# Shared environment values are defined once in 01-config.yaml.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingestion
+  namespace: smart-farm
+  labels:
+    app: ingestion
+spec:
+  type: ClusterIP
+  selector:
+    app: ingestion
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingestion
+  namespace: smart-farm
+  labels:
+    app: ingestion
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ingestion
+  template:
+    metadata:
+      labels:
+        app: ingestion
+    spec:
+      containers:
+        - name: ingestion
+          image: farm-ingestion:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef: {name: farm-config}
+          env:
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: farm-secret, key: DATABASE_URL}}
+          # Liveness asks "is the process alive". It deliberately does not check
+          # the database: if the database blips we want Kubernetes to stop
+          # sending traffic here, not to restart a container that is working.
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          # Readiness does check the database, so traffic is held back until it
+          # can actually be served.
+          readinessProbe:
+            httpGet: {path: /ready, port: 8000}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits:   {cpu: 500m, memory: 256Mi}

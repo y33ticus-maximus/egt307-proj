@@ -1,0 +1,145 @@
+# PostgreSQL: storage, service and deployment.
+#
+# This is the only part of the system that stores anything. Everything else can
+# be deleted and recreated freely; this cannot, because the readings, model
+# predictions and incident history live here.
+#
+# Storage is a PersistentVolume claimed by a PersistentVolumeClaim, and the
+# Deployment mounts the claim. Because the volume outlives the pod, deleting
+# the PostgreSQL pod does not lose the data: a replacement pod starts, claims
+# the same volume, and the incident history is still there.
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: postgres-vol
+  labels:
+    type: local
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  # hostPath stores the data on the node itself, which is what works on a
+  # single-node Minikube cluster. A real cluster would use a network volume,
+  # because hostPath ties the data to one machine.
+  hostPath:
+    path: "/data/postgres-vol"
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: postgres-pvc
+  namespace: smart-farm
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # An empty storageClassName with an explicit volumeName binds this claim to
+  # the volume above, rather than letting Minikube provision a new one.
+  storageClassName: ""
+  volumeName: postgres-vol
+  resources:
+    requests:
+      storage: 1Gi
+---
+# Internal only. Nothing outside the cluster should reach the database
+# directly, so this is a ClusterIP service with no nodePort. The services find
+# it by the name "postgres", which is the hostname in DATABASE_URL.
+kind: Service
+apiVersion: v1
+metadata:
+  name: postgres
+  namespace: smart-farm
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: smart-farm
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  # Recreate, not RollingUpdate, and this matters.
+  #
+  # A rolling update starts the replacement pod before stopping the old one.
+  # Both would then mount the same ReadWriteOnce volume, and two PostgreSQL
+  # processes writing the same data directory corrupts the database. Recreate
+  # stops the old pod first and accepts a few seconds of downtime instead.
+  #
+  # The application services are built to survive that gap: they hold /ready at
+  # 503 while the database is away rather than exiting, so nothing crashes
+  # while PostgreSQL restarts.
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: farmdb
+            - name: POSTGRES_USER
+              value: farm
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: farm-secret
+                  key: POSTGRES_PASSWORD
+            # The volume root is not empty on first mount, and PostgreSQL
+            # refuses to initialise into a non-empty directory. Pointing PGDATA
+            # at a subdirectory avoids that.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+            - name: postgres-init
+              mountPath: /docker-entrypoint-initdb.d
+          # pg_isready rather than a port check: the port opens several seconds
+          # before the database will actually answer a query, so a port check
+          # would mark the pod ready too early.
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "farm", "-d", "farmdb"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "farm", "-d", "farmdb"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+        - name: postgres-init
+          configMap:
+            name: postgres-init
+      restartPolicy: Always

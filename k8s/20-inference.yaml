@@ -1,0 +1,106 @@
+# Inference service. THIS IS THE ONE WE SCALE.
+#
+# Why this service and not another:
+#   - It stores nothing. A prediction depends only on the numbers in the
+#     request, so any copy can answer any request.
+#   - Every reading from every zone passes through it, so it is the first thing
+#     that would struggle as the farm grows.
+#
+# The ingestion and dashboard services each hold a database connection, so
+# adding copies of those would multiply connections to a single database. The
+# database itself cannot be copied at all without corrupting it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: inference
+  namespace: smart-farm
+spec:
+  selector:
+    app: inference
+  ports:
+    - port: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference
+  namespace: smart-farm
+spec:
+  replicas: 3
+  revisionHistoryLimit: 3
+  # A pod must stay ready for ten seconds before the rollout counts it as a
+  # success, so an image that starts and then crashes cannot roll all the way
+  # through unnoticed.
+  minReadySeconds: 10
+  # maxUnavailable: 0 means a deploy never reduces serving capacity. Kubernetes
+  # starts a replacement, waits for its readiness probe, then retires an old pod.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: inference
+  template:
+    metadata:
+      labels:
+        app: inference
+    spec:
+      containers:
+        - name: inference
+          image: farm-inference:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          # Liveness: is the process alive? Restart it if not.
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 25
+            periodSeconds: 15
+          # Readiness: is the model loaded? Hold traffic back until it is.
+          readinessProbe:
+            httpGet: {path: /ready, port: 8000}
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          # A CPU request is required for the autoscaler below to work out a
+          # percentage.
+          resources:
+            requests: {cpu: 200m, memory: 384Mi}
+            limits:   {cpu: 1000m, memory: 768Mi}
+---
+# Adds or removes copies automatically based on how busy they are.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: inference
+  namespace: smart-farm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: inference
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+---
+# Protects the service during voluntary disruption, such as a node being drained
+# for maintenance. Without it, kubectl drain would evict all three inference
+# pods at once. This is a different concern from the autoscaler above: the HPA
+# decides how many pods there should be, this decides how many may go at once.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: inference
+  namespace: smart-farm
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: inference

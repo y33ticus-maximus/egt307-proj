@@ -1,0 +1,51 @@
+# Sensor simulator. Stands in for the hardware so the cluster has live data.
+# On a real farm this would be deleted and the readings would come from sensors.
+apiVersion: v1
+kind: Service
+metadata:
+  name: simulator
+  namespace: smart-farm
+spec:
+  type: NodePort
+  selector:
+    app: simulator
+  ports:
+    - port: 8000
+      nodePort: 30090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simulator
+  namespace: smart-farm
+spec:
+  # Only one. Two copies would both send readings for the same zones at the same
+  # timestamps, and the second set would simply be rejected as duplicates.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: simulator
+  template:
+    metadata:
+      labels:
+        app: simulator
+    spec:
+      containers:
+        - name: simulator
+          image: farm-simulator:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef: {name: farm-config}
+          livenessProbe:
+            httpGet: {path: /health, port: 8000}
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: {path: /ready, port: 8000}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits:   {cpu: 200m, memory: 192Mi}
