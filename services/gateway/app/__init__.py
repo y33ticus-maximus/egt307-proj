@@ -1,0 +1,1 @@
+"""Gateway Flask application package."""
