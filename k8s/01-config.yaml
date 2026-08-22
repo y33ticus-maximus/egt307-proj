@@ -1,17 +1,4 @@
-# Namespace and configuration.
-#
-# The Namespace comes first because everything below it is created inside it,
-# and kubectl applies the documents in a file in order. Keeping the whole
-# system in one namespace means it can be removed in one command, which matters
-# when redeploying repeatedly during development:
-#
-#   kubectl delete namespace smart-farm
-#
-# Two ConfigMaps follow, for two different jobs:
-#   farm-config    environment variables read by the services at startup
-#   postgres-init  the SQL file PostgreSQL runs the first time it starts
-#
-# Nothing secret goes in here. The database password lives in 01-secret.yaml.
+
 kind: Namespace
 apiVersion: v1
 metadata:
