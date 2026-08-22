@@ -1,13 +1,4 @@
-# PostgreSQL: storage, service and deployment.
-#
-# This is the only part of the system that stores anything. Everything else can
-# be deleted and recreated freely; this cannot, because the readings, model
-# predictions and incident history live here.
-#
-# Storage is a PersistentVolume claimed by a PersistentVolumeClaim, and the
-# Deployment mounts the claim. Because the volume outlives the pod, deleting
-# the PostgreSQL pod does not lose the data: a replacement pod starts, claims
-# the same volume, and the incident history is still there.
+
 kind: PersistentVolume
 apiVersion: v1
 metadata:
