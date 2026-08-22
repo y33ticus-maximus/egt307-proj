@@ -40,6 +40,21 @@ so the project builds without downloading anything.
 project. No matching public source was identified, and it must not be presented
 as measurements collected from a real farm.
 
+**How Data was Generated:** We sourced 4 Datasets, each containing different features required for accurate analysis. We will call them "Reference Datasets"
+                            
+| Dataset | Name | Contents | Reference |
+|---|---|---|---|
+| Reference Dataset 1 | Plant_Parameters.csv | Contains soil and plant input parameters, including soil EC and fertilizer application values such as urea, TSP and MOP. | https://www.kaggle.com/datasets/r3trovision/soil-moisture-temp-and-nutritions/data |
+| Reference Dataset 2 | TARP.csv | 15% | https://www.kaggle.com/datasets/nelakurthisudheer/dataset-for-predicting-watering-the-plants |
+| Reference Dataset 3 | cropdata_updated.csv | **2%** | https://www.kaggle.com/datasets/chaitanyagopidesi/smart-agriculture-dataset?resource=download&select=cropdata_updated.csv |
+| Reference Dataset 4 | data_core.csv | **2%** | https://www.kaggle.com/datasets/shankarpriya2913/crop-and-soil-dataset/data?select=data_core.csv | 
+
+After Selecting these 4 Datasets, We used AI to help merge the data from these reference datasets into 1 dataset which is `greenhouse_conditions.csv`. The Command Given to the AI was such that it used values and trends similar to the reference Dataset. This allows for the use of more accurate data that can be used for analysis
+
+This was the Explanation Behind how the Refernce Datasets were merged:
+`The rationale used when merging the four datasets was to create one complete and realistic greenhouse dataset, since no individual dataset contained all the required environmental, soil, crop and fertilizer variables. Instead of directly joining the datasets row-by-row, relevant features and value ranges were taken from each source: cropdata_updated and data_core provided crop and temperature-related information, TARP contributed environmental variables such as soil moisture, humidity, rainfall and pressure, while Plant_Parameters provided soil and fertilizer-related values such as soil EC and fertilizer quantities. These variables were then standardised into consistent column names and units, and synthetic values were generated within realistic ranges while preserving logical relationships between variables, such as suitable pH ranges for different soil types. This approach allowed the four separate datasets to be combined into a single structured dataset suitable for greenhouse monitoring and machine learning analysis.`
+
+
 ### What the model uses
 
 Eleven inputs. Eight come from sensors; three come from a soil test and are
