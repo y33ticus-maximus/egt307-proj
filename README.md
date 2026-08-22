@@ -44,10 +44,10 @@ as measurements collected from a real farm.
                             
 | Dataset | Name | Contents | Reference |
 |---|---|---|---|
-| Reference Dataset 1 | Plant_Parameters.csv | Contains soil and plant input parameters, including soil EC and fertilizer application values such as urea, TSP and MOP. | https://www.kaggle.com/datasets/r3trovision/soil-moisture-temp-and-nutritions/data |
-| Reference Dataset 2 | TARP.csv | 15% | https://www.kaggle.com/datasets/nelakurthisudheer/dataset-for-predicting-watering-the-plants |
-| Reference Dataset 3 | cropdata_updated.csv | **2%** | https://www.kaggle.com/datasets/chaitanyagopidesi/smart-agriculture-dataset?resource=download&select=cropdata_updated.csv |
-| Reference Dataset 4 | data_core.csv | **2%** | https://www.kaggle.com/datasets/shankarpriya2913/crop-and-soil-dataset/data?select=data_core.csv | 
+| Reference Dataset 1 | Plant_Parameters.csv | soil and plant input parameters, soil EC and fertilizer application values such as urea, TSP and MOP. | https://www.kaggle.com/datasets/r3trovision/soil-moisture-temp-and-nutritions/data |
+| Reference Dataset 2 | TARP.csv | greenhouse/environmental sensor data, air humidity, soil moisture, soil humidity, atmospheric pressure, rainfall and related environmental readings. | https://www.kaggle.com/datasets/nelakurthisudheer/dataset-for-predicting-watering-the-plants |
+| Reference Dataset 3 | cropdata_updated.csv | crop-related and environmental data, temperature and other growing condition variables used to represent suitable conditions for different crops. | https://www.kaggle.com/datasets/chaitanyagopidesi/smart-agriculture-dataset?resource=download&select=cropdata_updated.csv |
+| Reference Dataset 4 | data_core.csv | temperature, humidity, soil moisture, soil type, crop type, and nutrient values such as nitrogen, potassium and phosphorus, together with fertilizer recommendations. | https://www.kaggle.com/datasets/shankarpriya2913/crop-and-soil-dataset/data?select=data_core.csv | 
 
 After Selecting these 4 Datasets, We used AI to help merge the data from these reference datasets into 1 dataset which is `greenhouse_conditions.csv`. The Command Given to the AI was such that it used values and trends similar to the reference Dataset. This allows for the use of more accurate data that can be used for analysis
 
