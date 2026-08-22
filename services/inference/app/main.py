@@ -5,12 +5,12 @@ import math
 import os
 from pathlib import Path
 
-import joblib
+import joblib  # used to load the trained model bundle that train.py saved to disk
 import numpy as np
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request 
 
-logging.basicConfig(level=logging.INFO, format="[inference] %(message)s")
-log = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="[inference] %(message)s")  # configure the root logger: show INFO and above, prefix every line with [inference]
+log = logging.getLogger(__name__)  # a logger object scoped to this module, used everywhere below instead of print()
 
 DEFAULT_MODEL_PATH = (
     Path(__file__).resolve().parent.parent / "artifacts" / "model.joblib"
@@ -95,7 +95,7 @@ def load_model():
     global MODEL, CLASSES, INFO
     if MODEL is not None:
         return
-    bundle = joblib.load(MODEL_PATH)
+    bundle = joblib.load(MODEL_PATH) 
     MODEL, CLASSES, INFO = bundle["model"], bundle["classes"], bundle["info"]
     log.info("loaded model %s", INFO["version"])
 
@@ -251,7 +251,7 @@ try:
 except Exception as exc:  # pragma: no cover
     # Without the model this service cannot answer, but it should still start
     # and say so through /ready rather than refusing to boot.
-    log.error("could not load the model from %s: %s", MODEL_PATH, exc)
+    log.error("could not load the model from %s: %s", MODEL_PATH, exc) 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000, debug=False, threaded=True)
+    app.run(host="0.0.0.0", port=8000, debug=False, threaded=True) # start Flask's built-in server, listening on all interfaces (required inside a container), debug mode off, one thread per request
