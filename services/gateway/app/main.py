@@ -12,8 +12,8 @@ import os
 import requests as http_requests
 from flask import Flask, Response, jsonify, request
 
-logging.basicConfig(level=logging.INFO, format="[gateway] %(message)s")
-log = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="[gateway] %(message)s") # configure the root logger: show INFO and above, prefix every line with [gateway]
+log = logging.getLogger(__name__)  # a logger object scoped to this module, used everywhere below instead of print()
 
 SERVICES = {
     "ingestion": os.getenv("INGESTION_URL", "http://ingestion:8000"),
@@ -36,7 +36,7 @@ ROUTES = [
 app = Flask(__name__)
 
 
-@app.after_request
+@app.after_request # register this function to run automatically after every request, modifying the response before it's sent
 def add_cors_headers(response):
     """Allow the dashboard on port 3000 to call the gateway on port 8080."""
     response.headers["Access-Control-Allow-Origin"] = "*"
@@ -46,18 +46,18 @@ def add_cors_headers(response):
 
 
 def find_route(path):
-    for public, service, target in sorted(ROUTES, key=lambda item: -len(item[0])):
+    for public, service, target in sorted(ROUTES, key=lambda item: -len(item[0])):  # sort routes by public-path length, longest first, so more specific routes win
         if path == public or path.startswith(public + "/"):
             return SERVICES[service], target + path[len(public) :]
     return None
 
 
-@app.get("/health")
+@app.get("/health")  # register a route: GET requests to /health call the function below
 def health():
-    return jsonify(service="gateway", status="ok")
+    return jsonify(service="gateway", status="ok") # always returns 200 OK if the process is alive enough to answer at all
 
 
-@app.get("/health/all")
+@app.get("/health/all") # aggregate health check — asks every internal service whether it is ready, in one call
 def health_all():
     """Verify that each application service is ready and reachable."""
     services = {"gateway": "up"}
@@ -73,12 +73,12 @@ def health_all():
     return jsonify(status=overall, services=services)
 
 
-@app.route("/api/<path:path>", methods=["GET", "POST", "DELETE", "OPTIONS"])
+@app.route("/api/<path:path>", methods=["GET", "POST", "DELETE", "OPTIONS"]) # register a catch-all route: any of these methods under /api/... calls the function below
 def forward(path):
-    if request.method == "OPTIONS":
-        return "", 204
+    if request.method == "OPTIONS": # browsers send an OPTIONS request first to check CORS permissions before the real request
+        return "", 204 # respond with an empty 204 No Content, which is enough to satisfy that CORS preflight check
 
-    route = find_route(request.path)
+    route = find_route(request.path) # work out which internal service (if any) should handle this exact request path
     if route is None:
         return jsonify(detail="unknown path"), 404
 
@@ -95,11 +95,11 @@ def forward(path):
             timeout=15,
         )
     except http_requests.Timeout:
-        return jsonify(detail="service timed out"), 504
+        return jsonify(detail="service timed out"), 504 
     except http_requests.RequestException:
         return jsonify(detail="service unavailable"), 503
 
-    log.info("%s %s -> %d", request.method, request.path, reply.status_code)
+    log.info("%s %s -> %d", request.method, request.path, reply.status_code) # log the method, original path, and the status code the internal service returned
     return Response(
         reply.content,
         status=reply.status_code,
