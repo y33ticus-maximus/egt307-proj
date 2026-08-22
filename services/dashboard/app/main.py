@@ -1,13 +1,13 @@
-"""Flask dashboard and incident-management service."""
+#Flask dashboard and incident-management service.
 
-import atexit
-import logging
+import atexit #register a function to run when the process shuts down
+import logging ## standard library logging, used instead of print() so output can be filtered/formatted
 import os
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path  # used to build a filesystem path to the static/ folder in an OS-independent way
 
-from flask import Flask, jsonify, request, send_from_directory
-from psycopg2.extras import RealDictCursor
+from flask import Flask, jsonify, request, send_from_directory  # the web framework and its request/response helpers
+from psycopg2.extras import RealDictCursor # a cursor type that returns rows as dicts (column name -> value) instead of plain tuples
 
 from . import db
 
@@ -17,33 +17,33 @@ log = logging.getLogger(__name__)
 STATIC = Path(__file__).resolve().parent.parent / "static"
 GATEWAY_PUBLIC_URL = os.getenv("GATEWAY_PUBLIC_URL", "http://localhost:8080")
 
-OPEN_AFTER = int(os.getenv("OPEN_AFTER", "2"))
-CLOSE_AFTER = int(os.getenv("CLOSE_AFTER", "3"))
+OPEN_AFTER = int(os.getenv("OPEN_AFTER", "2")) # how many consecutive bad readings are needed before an incident is opened
+CLOSE_AFTER = int(os.getenv("CLOSE_AFTER", "3")) # how many consecutive Optimal readings are needed before an incident is resolved
 SEVERITY = {"Optimal": 0, "Warning": 1, "Critical": 2}
 
-app = Flask(__name__, static_folder=str(STATIC), static_url_path="/static")
+app = Flask(__name__, static_folder=str(STATIC), static_url_path="/static") # create the Flask app; __name__ tells Flask where this module lives; static_folder/static_url_path wire up the STATIC path above to the /static URL prefix
 
-
+ # define a helper that turns one database row into something jsonify() can send
 def serialise(row):
     return {
         key: value.isoformat() if isinstance(value, datetime) else value
         for key, value in dict(row).items()
     }
 
-
+ # define a helper: fetch the most recent real (non-pending) labels for one zone
 def recent_labels(zone_id, limit):
     """Return the newest non-pending labels for a zone."""
-    with db.connection() as conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+    with db.connection() as conn:  # borrow a database connection from the pool; automatically returned when this block exits
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:  #open a cursor on that connection that returns dict-like rows
             cursor.execute(
                 """SELECT p.label FROM predictions p
                    JOIN readings r ON r.id = p.reading_id
                    WHERE p.zone_id = %s AND p.label <> 'pending'
                    ORDER BY r.recorded_at DESC LIMIT %s""",
-                (zone_id, limit),
+                (zone_id, limit), # the two values substituted for the two %s placeholders above, in order
             )
-            rows = cursor.fetchall()
-    return [row["label"] for row in rows]
+            rows = cursor.fetchall() # pull every matching row from the cursor into a Python list
+    return [row["label"] for row in rows]  # extract just the 'label' field from each row into a plain list of strings
 
 
 def open_incident(zone_id):
@@ -170,13 +170,13 @@ def incidents():
     return jsonify(incidents=[serialise(row) for row in rows])
 
 
-@app.get("/config.json")
+@app.get("/config.json")  # register a route: GET requests to /config.json call the function below
 def config():
     """Tell the browser which public gateway address to use."""
     return jsonify(gatewayUrl=GATEWAY_PUBLIC_URL)
 
 
-@app.get("/")
+@app.get("/")  # register a route: GET requests to / (the root path) call the function below
 def index():
     return send_from_directory(STATIC, "index.html")
 
