@@ -40,6 +40,15 @@ so the project builds without downloading anything.
 project. No matching public source was identified, and it must not be presented
 as measurements collected from a real farm.
 
+**How Data was Generated:** We sourced 3 Datasets, each containing different features required for accurate analysis. We will call them "Reference Datasets"
+                            
+| Dataset | Name | Contents | Reference |
+|---|---|---|---|
+| Reference Dataset 1 | Plant_Parameters.csv | 83% | https://www.kaggle.com/datasets/r3trovision/soil-moisture-temp-and-nutritions/data |
+| Reference Dataset 2 | TARP.csv | 15% | https://www.kaggle.com/datasets/nelakurthisudheer/dataset-for-predicting-watering-the-plants |
+| Reference Dataset 3 | cropdata_updated.csv | **2%** | https://www.kaggle.com/datasets/chaitanyagopidesi/smart-agriculture-dataset?resource=download&select=cropdata_updated.csv |
+| Reference Dataset 4 | data_core.csv | **2%** | https://www.kaggle.com/datasets/shankarpriya2913/crop-and-soil-dataset/data?select=data_core.csv |
+
 ### What the model uses
 
 Eleven inputs. Eight come from sensors; three come from a soil test and are
